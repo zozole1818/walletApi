@@ -94,7 +94,7 @@ func (ctr *TransactionController) ExecuteTransaction(c echo.Context) error {
 // @ID RetriveTransactions
 // @Tags transactions
 // @Produce  json
-// @Success 201 {array} model.TransactionResponse
+// @Success 200 {array} model.TransactionResponse
 // @Failure 401 {object} model.ErrResponse
 // @Failure 500 {object} model.ErrResponse
 // @Router /api/v1/transactions [get]
