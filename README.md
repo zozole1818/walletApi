@@ -6,8 +6,8 @@ This is REST API written in Go backed by PostreSQL.
 
 Project is POC and the **key features** are:
 * transfer of money between users
-* information about user balance
-* information about user transactions
+* information about user's balance
+* information about user's transactions
 
 ### Starting point
 * user registration functionality skipped - provisioning of users/credentials via script - `/scripts/populate_db.sh` - executed from within `/devops/web/entrypoint.sh`
@@ -58,6 +58,8 @@ Users provisioned during startup:
 | zazu18      | haslo    |
 | johndoe11   | haslo    |
 | jimsmith44  | haslo    |
+
+**NOTE:** When you set Bearer token then you're able to see balances and transactions for **the user that was authorized**. To see balances and transactions of different user you must login with different credentials.
 
 ## Prometheus metric endpoint
 Prometheus metric endpoint is not visible on swagger UI. To see metrics please go to `http://localhost:8000/metrics`.
