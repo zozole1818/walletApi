@@ -20,8 +20,8 @@ Project is POC and the **key features** are:
 ### Instalation
 ```bash
 $ git clone https://github.com/zozole1818/walletApi.git
-$ cd devops
-$ docker-compose up
+$ cd walletApi/devops
+$ docker-compose up # or sudo docker-compose up
 ```
 
 If you can see in the terminal:
