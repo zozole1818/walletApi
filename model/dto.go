@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"net/http"
 	"time"
 )
@@ -9,6 +10,19 @@ type TransactionRequest struct {
 	SenderBalanceID   int     `json:"senderBalanceId,omitempty" example:"1"`
 	ReceiverBalanceID int     `json:"receiverBalanceId,omitempty" example:"2"`
 	Amount            float64 `json:"amount,omitempty" example:"20"`
+}
+
+func (tr TransactionRequest) IsValid() (bool, error) {
+	if tr.SenderBalanceID <= 0 || tr.ReceiverBalanceID <= 0 {
+		return false, errors.New("sender or receiver balance not found")
+	}
+	if tr.SenderBalanceID == tr.ReceiverBalanceID {
+		return false, errors.New("sender and receiver balances cannot be the same")
+	}
+	if tr.Amount <= 0 {
+		return false, errors.New("amount field must be greater then 0")
+	}
+	return true, nil
 }
 
 type TransactionResponse struct {

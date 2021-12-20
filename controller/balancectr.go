@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -11,21 +10,18 @@ import (
 	"zuzanna.com/walletapi/service"
 )
 
-// new file?
-var ErrBadUserIDMsg = "Proper user ID required."
 var ErrInternalServerMsg = "Server error, please try again."
-var ErrUnauthorizedMsg = "Login failed. Please double check username and password."
+var ErrWrongLoginMsg = "Login failed. Please double check username and password."
 var ErrInvalidTokenMsg = "Invalid token."
-var ErrMissingAuthHeaderMsg = "Authorization header required."
 
 type BalanceController struct {
-	E          *echo.Echo
+	G          *echo.Group
 	BalanceSvc service.BalanceService
 	LoginSvc   service.AuthService
 }
 
 func (ctr BalanceController) Init() {
-	ctr.E.GET(balancesEndpoint, ctr.GetBalances)
+	ctr.G.GET(balancesEndpoint, ctr.GetBalances)
 }
 
 // @Summary Retrieves list of balances for authenticated user.
@@ -41,17 +37,10 @@ func (ctr BalanceController) Init() {
 func (ctr BalanceController) GetBalances(c echo.Context) error {
 	log.Infof("GET %s", replaceID(balancesEndpoint, ""))
 
-	h := c.Request().Header.Get("Authorization")
-	userID, err := ctr.LoginSvc.GetUserID(h)
+	userID, err := ctr.LoginSvc.GetUserIDFromToken(c)
 	if err != nil {
-		if errors.Is(err, service.ErrMissingAuthHeader) {
-			log.Errorf("error: %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrMissingAuthHeaderMsg))
-		}
-		if errors.Is(err, service.ErrTokenInvalid) {
-			log.Errorf("invalid token; err %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
-		}
+		log.Errorf("error while reading user ID from token; error: ", err)
+		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
 	}
 
 	balances, err := ctr.BalanceSvc.GetByUserID(userID)

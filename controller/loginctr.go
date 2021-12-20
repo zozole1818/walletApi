@@ -38,13 +38,13 @@ func (ctr LoginController) Login(c echo.Context) error {
 	password := c.FormValue("password")
 
 	if username == "" || password == "" {
-		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrUnauthorizedMsg))
+		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrWrongLoginMsg))
 	}
 
 	token, err := ctr.Svc.Authenticate(username, password)
 	if err != nil {
 		if errors.Is(err, service.ErrUnauthorized) {
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrUnauthorizedMsg))
+			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrWrongLoginMsg))
 		}
 		log.Errorf("error while authenticate user %s; error %w", username, err)
 		return c.JSON(http.StatusInternalServerError, model.NewErrResponse(http.StatusInternalServerError, ErrInternalServerMsg))

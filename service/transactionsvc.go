@@ -8,13 +8,13 @@ import (
 	"zuzanna.com/walletapi/repository"
 )
 
-var ErrTransactionConflict = errors.New("sender or receiver balances are locked, new transaction is not allowed")
+var ErrBalanceNotFound = errors.New("sender or receiver balances not found")
+var ErrBalancesLocked = errors.New("sender or receiver balances are locked, new transaction is not allowed")
 var ErrInsufficientBalance = errors.New("sender/receiver locked or insufficient balance of a sender")
-var ErrUnauthorizedTransaction = errors.New("userId from JWT token differ from balance sender ID from transaction")
+var ErrUnauthorizedTransaction = errors.New("userID from JWT token differ from balance's userID of sender for transaction")
 
 type TransactionService interface {
 	Execute(userID int, t model.Transaction) (model.Transaction, error)
-	// change to query object?
 	Retrieve(userID int) ([]model.Transaction, error)
 }
 
@@ -39,7 +39,7 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 	// acquire locks on balances
 	err := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
 		if bs[0].IsLocked() || bs[1].IsLocked() {
-			return nil, ErrTransactionConflict
+			return nil, ErrBalancesLocked
 		}
 
 		bs[0].Lock()
@@ -48,19 +48,22 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 		return bs, nil
 	})
 	if err != nil {
-		log.Errorf("#Execute(...) error cannot acquire lock for sender/receiver balance; error: %w", err)
+		if err == repository.ErrBalancesNotFound {
+			return model.Transaction{}, ErrBalanceNotFound
+		}
+		log.Errorf("#Execute(...) error cannot acquire lock for sender/receiver balance; error: %v", err)
 		return model.Transaction{}, err
 	}
 
 	// make transaction
 	newTransaction, err := svc.repo.MakeTransaction(t, func(t *model.TransactionDDD) (*model.TransactionDDD, error) {
-		if userID != t.SenderBalance.ID {
-			log.Warnf("#Execute(...) failed while making transaction, error: %w,", ErrUnauthorizedTransaction)
+		if userID != t.SenderBalance.UserID {
+			log.Warnf("#Execute(...) failed while making transaction, error: %v,", ErrUnauthorizedTransaction)
 			return nil, ErrUnauthorizedTransaction
 		}
 
 		if !t.IsValid() {
-			log.Warnf("#Execute(...) failed while making transaction, error: %w", ErrInsufficientBalance)
+			log.Warnf("#Execute(...) failed while making transaction, error: %v", ErrInsufficientBalance)
 			return nil, ErrInsufficientBalance
 		}
 
@@ -71,11 +74,11 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 		return t, nil
 	})
 	if err != nil {
-		log.Errorf("#Execute(...) error make transaction %+v; error: %w", t, err)
+		log.Errorf("#Execute(...) error make transaction %+v; error: %v", t, err)
 		// release locks on balances
-		err := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
+		errFromUpdate := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
 			if bs[0].IsLocked() && bs[1].IsLocked() {
-				return nil, ErrTransactionConflict
+				return nil, ErrBalancesLocked
 			}
 
 			bs[0].Unlock()
@@ -83,9 +86,9 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 
 			return bs, nil
 		})
-		if err != nil {
-			log.Errorf("#Execute(...) error cannot acquire lock for sender/receiver balance; error: %w", err)
-			return model.Transaction{}, err
+		if errFromUpdate != nil {
+			log.Errorf("#UpdateBalances(...) error cannot remove lock for sender/receiver balance; error: %v", err)
+			return model.Transaction{}, errFromUpdate
 		}
 		return model.Transaction{}, err
 	}

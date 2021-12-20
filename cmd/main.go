@@ -6,7 +6,9 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger" // echo-swagger middleware
 	"zuzanna.com/walletapi/controller"
 	_ "zuzanna.com/walletapi/docs"
@@ -32,7 +34,7 @@ import (
 // @in header
 // @name Authorization
 func main() {
-	// toDo os.Getenv("DATABASE_URL")
+
 	pool, err := pgxpool.Connect(context.Background(), EnvWithDefault("DATABASE_URL", "postgres://postgres:admin@localhost:5432/mobile_wallet"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
@@ -42,6 +44,8 @@ func main() {
 
 	e := echo.New()
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
+	p := prometheus.NewPrometheus("echo", nil)
+	p.Use(e)
 
 	loginSvc := service.AuthServiceImpl{
 		CredentialsDB: repository.CredentialsDB{Pool: pool},
@@ -51,13 +55,22 @@ func main() {
 		E:   e,
 		Svc: loginSvc,
 	}
+
+	api := e.Group("/api")
+	api.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+		SigningKey:              service.GetJwtTokenSign(),
+		TokenLookup:             "header:Authorization",
+		ErrorHandlerWithContext: service.JWTErrorHandlerWithContext,
+		Claims:                  &service.JwtCustomClaims{},
+	}))
+
 	balanceController := controller.BalanceController{
-		E:          e,
+		G:          api,
 		BalanceSvc: service.NewBalanceService(postgreBalanceRepo),
 		LoginSvc:   loginSvc,
 	}
 	transactionController := controller.TransactionController{
-		E:        e,
+		G:        api,
 		LoginSvc: loginSvc,
 		Svc:      service.NewTransactionService(postgreBalanceRepo),
 	}

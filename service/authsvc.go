@@ -3,25 +3,23 @@ package service
 import (
 	"encoding/base64"
 	"errors"
+	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	"zuzanna.com/walletapi/model"
 	"zuzanna.com/walletapi/repository"
 )
 
 var ErrUnauthorized = errors.New("login failed")
-var ErrTokenInvalid = errors.New("invalid JWT token")
-var ErrMissingAuthHeader = errors.New("missing Authorization header")
 
 type AuthService interface {
-	// Authenticate authenticate the user using login and password. Returns JWT token and error whether occurs.
 	Authenticate(login, password string) (string, error)
-	// GetUserID reads userID from JWT token. Returns userID and error whether occurs. When token invalid ErrTokenInvalid returnd.
-	GetUserID(header string) (int, error)
-	// IsAdmin(jwt string) (bool, error)
+	GetUserIDFromToken(echo.Context) (int, error)
 }
 
 type AuthServiceImpl struct {
@@ -30,9 +28,8 @@ type AuthServiceImpl struct {
 
 var jwtTokenSign []byte
 
-type jwtCustomClaims struct {
+type JwtCustomClaims struct {
 	UserID int `json:"user_id"`
-	// Admin bool   `json:"admin"`
 	jwt.StandardClaims
 }
 
@@ -45,6 +42,20 @@ func init() {
 	}
 }
 
+func GetJwtTokenSign() []byte {
+	return jwtTokenSign
+}
+
+func JWTErrorHandlerWithContext(err error, c echo.Context) error {
+	if err == middleware.ErrJWTMissing {
+		return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, "Missing or malformed JWT token."))
+	}
+	if err == middleware.ErrJWTInvalid {
+		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, "Invalid or expired JWT token."))
+	}
+	return nil
+}
+
 func (svc AuthServiceImpl) Authenticate(login, password string) (string, error) {
 	credentials, err := svc.CredentialsDB.Get(login)
 	if err != nil {
@@ -52,19 +63,19 @@ func (svc AuthServiceImpl) Authenticate(login, password string) (string, error) 
 			log.Infof("no record found for login %s", login)
 			return "", ErrUnauthorized
 		}
-		log.Errorf("error while retrieving credentials for login %s; error %w", login, err)
+		log.Errorf("error while retrieving credentials for login %s; error %v", login, err)
 		return "", err
 	}
-	// todo better password hashing perhaps?
+
 	encodedPass, err := base64.StdEncoding.DecodeString(credentials.Password)
 	if err != nil {
-		log.Errorf("error while encoding password for login %s; error %w", login, err)
+		log.Errorf("error while encoding password for login %s; error %v", login, err)
 		return "", err
 	}
 	if login != credentials.Login || password != string(encodedPass) {
 		return "", ErrUnauthorized
 	}
-	claims := &jwtCustomClaims{
+	claims := &JwtCustomClaims{
 		credentials.UserID,
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(time.Hour).Unix(),
@@ -74,28 +85,17 @@ func (svc AuthServiceImpl) Authenticate(login, password string) (string, error) 
 
 	signedToken, err := token.SignedString(jwtTokenSign)
 	if err != nil {
-		log.Errorf("error while signing token; error %w", err)
+		log.Errorf("error while signing token; error %v", err)
 		return "", err
 	}
 	return signedToken, nil
 }
 
-func (svc AuthServiceImpl) GetUserID(header string) (int, error) {
-	if header == "" {
-		return 0, ErrMissingAuthHeader
+func (svc AuthServiceImpl) GetUserIDFromToken(c echo.Context) (int, error) {
+	userToken := c.Get("user").(*jwt.Token)
+	claims, ok := userToken.Claims.(*JwtCustomClaims)
+	if !ok {
+		return 0, errors.New("error while reading JWT custom claims")
 	}
-	cleanJWT := strings.Replace(header, "Bearer ", "", 1)
-	token, err := jwt.ParseWithClaims(cleanJWT, &jwtCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return jwtTokenSign, nil
-	})
-	if err != nil {
-		log.Errorf("error while parsing JWT token; error %w", err)
-		return 0, ErrTokenInvalid
-	}
-	customClaims, ok := token.Claims.(*jwtCustomClaims)
-	if !ok || !token.Valid {
-		log.Errorf("error while casting JWT custom claims; error %w", err)
-		return 0, ErrTokenInvalid
-	}
-	return customClaims.UserID, nil
+	return claims.UserID, nil
 }

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -10,17 +9,21 @@ import (
 	"zuzanna.com/walletapi/service"
 )
 
-var ErrBadRequestMsg = "Could not parse body request. Please doble check the JSON."
+var ErrCannotParseBodyMsg = "Could not parse body request. Please doble check the JSON."
+var ErrUnauthorizedTransactionMsg = "User has no privilages to make requested transaction."
+var ErrErrInsufficientBalanceMsg = "There is not enough money on sender's balance to make requested transaction."
+var ErrBalancesLockedMsg = "Sender or receiver balance is locked - no money transfer allowed right now."
+var ErrBalancesNotFoundMsg = "Sender or receiver balance not found."
 
 type TransactionController struct {
-	E        *echo.Echo
+	G        *echo.Group
 	Svc      service.TransactionService
 	LoginSvc service.AuthService
 }
 
 func (ctr *TransactionController) Init() {
-	ctr.E.GET(transactionsEndpoint, ctr.RetriveTransactions)
-	ctr.E.POST(transactionsEndpoint, ctr.ExecuteTransaction)
+	ctr.G.GET(transactionsEndpoint, ctr.RetriveTransactions)
+	ctr.G.POST(transactionsEndpoint, ctr.ExecuteTransaction)
 }
 
 // @Summary Executes transaction between two balances.
@@ -39,25 +42,22 @@ func (ctr *TransactionController) Init() {
 func (ctr *TransactionController) ExecuteTransaction(c echo.Context) error {
 	log.Infof("POST %s", transactionsEndpoint)
 
-	h := c.Request().Header.Get("Authorization")
-	userID, err := ctr.LoginSvc.GetUserID(h)
+	userID, err := ctr.LoginSvc.GetUserIDFromToken(c)
 	if err != nil {
-		if errors.Is(err, service.ErrMissingAuthHeader) {
-			log.Errorf("error: %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrMissingAuthHeaderMsg))
-		}
-		if errors.Is(err, service.ErrTokenInvalid) {
-			log.Errorf("invalid token; err %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
-		}
+		log.Errorf("error while reading user ID from token; error: ", err)
+		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
 	}
 
 	t := new(model.TransactionRequest)
 	err = c.Bind(t)
-	log.Infof("body from requets: %+v", t)
+
 	if err != nil {
 		log.Errorf("cannot bind TransactionRequest struct with the Request body; error: %w", err)
-		return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, ErrBadRequestMsg))
+		return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, ErrCannotParseBodyMsg))
+	}
+
+	if ok, err := t.IsValid(); !ok {
+		return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, err.Error()))
 	}
 
 	transaction := model.Transaction{
@@ -69,9 +69,20 @@ func (ctr *TransactionController) ExecuteTransaction(c echo.Context) error {
 
 	transaction, err = ctr.Svc.Execute(userID, transaction)
 	if err != nil {
-		log.Errorf("cannot execute transaction; error: %w", err)
-		// ToDo differenciate errors and return meaningful responses
-		return c.JSON(http.StatusInternalServerError, model.NewErrResponse(http.StatusInternalServerError, err.Error()))
+		log.Errorf("cannot execute transaction; error: %v", err)
+		if err == service.ErrBalanceNotFound {
+			return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, ErrBalancesNotFoundMsg))
+		}
+		if err == service.ErrBalancesLocked {
+			return c.JSON(http.StatusConflict, model.NewErrResponse(http.StatusConflict, ErrBalancesLockedMsg))
+		}
+		if err == service.ErrInsufficientBalance {
+			return c.JSON(http.StatusBadRequest, model.NewErrResponse(http.StatusBadRequest, ErrErrInsufficientBalanceMsg))
+		}
+		if err == service.ErrUnauthorizedTransaction {
+			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrUnauthorizedTransactionMsg))
+		}
+		return c.JSON(http.StatusInternalServerError, model.NewErrResponse(http.StatusInternalServerError, ErrInternalServerMsg))
 	}
 
 	return c.JSON(http.StatusCreated, model.NewTransactionResponse(transaction))
@@ -90,17 +101,10 @@ func (ctr *TransactionController) ExecuteTransaction(c echo.Context) error {
 func (ctr *TransactionController) RetriveTransactions(c echo.Context) error {
 	log.Infof("GET %s", transactionsEndpoint)
 
-	h := c.Request().Header.Get("Authorization")
-	userID, err := ctr.LoginSvc.GetUserID(h)
+	userID, err := ctr.LoginSvc.GetUserIDFromToken(c)
 	if err != nil {
-		if errors.Is(err, service.ErrMissingAuthHeader) {
-			log.Errorf("error: %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrMissingAuthHeaderMsg))
-		}
-		if errors.Is(err, service.ErrTokenInvalid) {
-			log.Errorf("invalid token; err %w", err)
-			return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
-		}
+		log.Errorf("error while reading user ID from token; error: ", err)
+		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, ErrInvalidTokenMsg))
 	}
 
 	transactions, err := ctr.Svc.Retrieve(userID)

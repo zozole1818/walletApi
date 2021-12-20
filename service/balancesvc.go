@@ -1,14 +1,9 @@
 package service
 
 import (
-	"errors"
-
 	"zuzanna.com/walletapi/model"
 	"zuzanna.com/walletapi/repository"
 )
-
-// different file?
-var ErrNoUserID = errors.New("user ID required")
 
 type BalanceService interface {
 	GetByUserID(userID int) ([]*model.Balance, error)
@@ -25,7 +20,6 @@ func NewBalanceService(r repository.BalanceRepo) BalanceServiceImpl {
 	return BalanceServiceImpl{repo: r}
 }
 
-// Get return User with coresponding balance.
 func (svc BalanceServiceImpl) GetByUserID(userID int) ([]*model.Balance, error) {
 	return svc.repo.GetList(userID)
 }

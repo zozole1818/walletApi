@@ -18,9 +18,7 @@ type BalanceRepo interface {
 	GetList(userID int) ([]*model.Balance, error)
 	UpdateBalances(balanceIDs []int, updateFn func(b []*model.Balance) ([]*model.Balance, error)) error
 
-	// maybe change model.Transaction to model.TransactionRequest?
 	MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (model.Transaction, error)
-
 	GetTransactions(userID int) ([]model.Transaction, error)
 }
 
@@ -37,7 +35,7 @@ func (r PostgreBalanceRepo) GetList(userID int) ([]*model.Balance, error) {
 	balances := []*model.Balance{}
 	rows, err := r.Pool.Query(context.Background(), "SELECT id, currency, balance, user_id FROM balance WHERE user_id=$1", userID)
 	if err != nil {
-		log.Errorf("error while retrieving balances for user with ID %d; error %w", userID, err)
+		log.Errorf("error while retrieving balances for user with ID %d; error %v", userID, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -46,7 +44,7 @@ func (r PostgreBalanceRepo) GetList(userID int) ([]*model.Balance, error) {
 		tmp := model.Balance{}
 		err = rows.Scan(&tmp.ID, &tmp.Currency, &tmp.Balance, &tmp.UserID)
 		if err != nil {
-			log.Errorf("error while reading balances for user with ID %d; error %w", userID, err)
+			log.Errorf("error while reading balances for user with ID %d; error %v", userID, err)
 			return nil, err
 		}
 		balances = append(balances, &tmp)
@@ -54,14 +52,14 @@ func (r PostgreBalanceRepo) GetList(userID int) ([]*model.Balance, error) {
 	return balances, nil
 }
 
-func (r PostgreBalanceRepo) GetTransactions(userID int) ([]model.Transaction, error) {
+func (r PostgreBalanceRepo) GetTransactions(userID int) (transactions []model.Transaction, err error) {
 	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
-		log.Errorf("#GetTransactions(...) failed, error: %w", err)
+		log.Errorf("#GetTransactions(...) failed, error: %v", err)
 		return nil, fmt.Errorf("unable to start a transaction; error: %w", err)
 	}
 	defer func() {
-		_ = r.finishTx(err, tx)
+		err = r.finishTx(err, tx)
 	}()
 
 	existingBalances, err := r.getBalances(tx, userID)
@@ -73,7 +71,7 @@ func (r PostgreBalanceRepo) GetTransactions(userID int) ([]model.Transaction, er
 		balanceIDs = append(balanceIDs, b.ID)
 	}
 
-	transactions, err := r.getTransactionsByBalanceIDs(tx, balanceIDs)
+	transactions, err = r.getTransactionsByBalanceIDs(tx, balanceIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +99,7 @@ func (r PostgreBalanceRepo) getTransactionsByBalanceIDs(tx pgx.Tx, balanceIDs []
 		if err == pgx.ErrNoRows {
 			return make([]model.Transaction, 0), nil
 		}
-		log.Errorf("#getTransactionsByBalanceIDs(...) error while retrieving transactions for balances with IDs %s; error %w", balanceIDs, err)
+		log.Errorf("#getTransactionsByBalanceIDs(...) error while retrieving transactions for balances with IDs %s; error %v", balanceIDs, err)
 		return nil, err
 	}
 
@@ -109,7 +107,7 @@ func (r PostgreBalanceRepo) getTransactionsByBalanceIDs(tx pgx.Tx, balanceIDs []
 		tmp := model.Transaction{}
 		err = rows.Scan(&tmp.ID, &tmp.SenderBalanceID, &tmp.ReceiverBalanceID, &tmp.Currency, &tmp.Amount, &tmp.Date)
 		if err != nil {
-			log.Errorf("#getTransactionsByBalanceIDs(...) error while scanning transactions for balances with IDs %s; error %w", balanceIDs, err)
+			log.Errorf("#getTransactionsByBalanceIDs(...) error while scanning transactions for balances with IDs %s; error %v", balanceIDs, err)
 			return nil, err
 		}
 		transactions = append(transactions, tmp)
@@ -118,14 +116,14 @@ func (r PostgreBalanceRepo) getTransactionsByBalanceIDs(tx pgx.Tx, balanceIDs []
 }
 
 // UpdateBalance update couple of balances by applying updateFn. All actions than happen here are included in one transaction.
-func (r PostgreBalanceRepo) UpdateBalances(IDs []int, updateFn func(bs []*model.Balance) ([]*model.Balance, error)) error {
+func (r PostgreBalanceRepo) UpdateBalances(IDs []int, updateFn func(bs []*model.Balance) ([]*model.Balance, error)) (err error) {
 	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
-		log.Errorf("#UpdateBalances(...) failed, error: %w", err)
+		log.Errorf("#UpdateBalances(...) failed, error: %v", err)
 		return fmt.Errorf("unable to start a transaction; error: %w", err)
 	}
 	defer func() {
-		_ = r.finishTx(err, tx)
+		err = r.finishTx(err, tx)
 	}()
 
 	existingBalances, err := r.getBalances(tx, IDs...)
@@ -150,14 +148,14 @@ func (r PostgreBalanceRepo) UpdateBalances(IDs []int, updateFn func(bs []*model.
 	return nil
 }
 
-func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (model.Transaction, error) {
+func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (madeTransaction model.Transaction, err error) {
 	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
-		log.Errorf("#MakeTransaction(...) failed, error: %w", err)
+		log.Errorf("#MakeTransaction(...) failed, error: %v", err)
 		return model.Transaction{}, fmt.Errorf("unable to start a transaction; error: %w", err)
 	}
 	defer func() {
-		_ = r.finishTx(err, tx)
+		err = r.finishTx(err, tx)
 	}()
 
 	existingBalances, err := r.getBalances(tx, t.SenderBalanceID, t.ReceiverBalanceID)
@@ -183,8 +181,11 @@ func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *mode
 	}
 
 	transaction, err = fn(transaction)
+	if err != nil {
+		return model.Transaction{}, err
+	}
 
-	newTransaction, err := r.createTransaction(tx, *transaction)
+	madeTransaction, err = r.createTransaction(tx, *transaction)
 	if err != nil {
 		return model.Transaction{}, err
 	}
@@ -194,7 +195,7 @@ func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *mode
 		return model.Transaction{}, err
 	}
 
-	return newTransaction, nil
+	return madeTransaction, nil
 }
 
 func (r PostgreBalanceRepo) createTransaction(tx pgx.Tx, t model.TransactionDDD) (model.Transaction, error) {
@@ -203,7 +204,7 @@ func (r PostgreBalanceRepo) createTransaction(tx pgx.Tx, t model.TransactionDDD)
 		"INSERT INTO transaction (sender_id, receiver_id, currency, amount, date) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 		t.SenderBalance.ID, t.ReceiverBalance.ID, string(t.Currency), t.Amount, t.Date).Scan(&tID)
 	if err != nil {
-		log.Errorf("#createTransaction(...) error while inserting into transaction table: %w", err)
+		log.Errorf("#createTransaction(...) error while inserting into transaction table: %v", err)
 		return model.Transaction{}, err
 	}
 	transaction := model.Transaction{
@@ -219,14 +220,14 @@ func (r PostgreBalanceRepo) createTransaction(tx pgx.Tx, t model.TransactionDDD)
 		"INSERT INTO balance_transaction (balance_id, transaction_id) VALUES ($1, $2)",
 		t.SenderBalance.ID, tID)
 	if err != nil {
-		log.Errorf("#createTransaction(...) error while inserting into balance_transaction table for balance_i %s: %w", t.SenderBalance.ID, err)
+		log.Errorf("#createTransaction(...) error while inserting into balance_transaction table for balance_i %s: %v", t.SenderBalance.ID, err)
 		return model.Transaction{}, err
 	}
 	_, err = tx.Exec(context.Background(),
 		"INSERT INTO balance_transaction (balance_id, transaction_id) VALUES ($1, $2)",
 		t.ReceiverBalance.ID, tID)
 	if err != nil {
-		log.Errorf("#createTransaction(...) error while inserting into balance_transaction table for balance_i %s: %w", t.ReceiverBalance.ID, err)
+		log.Errorf("#createTransaction(...) error while inserting into balance_transaction table for balance_i %s: %v", t.ReceiverBalance.ID, err)
 		return model.Transaction{}, err
 	}
 
@@ -252,15 +253,13 @@ func (r PostgreBalanceRepo) getBalances(tx pgx.Tx, IDs ...int) ([]*model.Balance
 	}
 	query += ")"
 
-	log.Warnf("query is: ", query)
-
 	rows, err := tx.Query(context.Background(), query, toArgs(IDs)...)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			log.Infof("no records for balances with IDs %s", IDs)
 			return make([]*model.Balance, 0), nil
 		}
-		log.Errorf("#getBalances(...) error while retrieving balances with IDs %s; error %w", IDs, err)
+		log.Errorf("#getBalances(...) error while retrieving balances with IDs %s; error %v", IDs, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -269,7 +268,7 @@ func (r PostgreBalanceRepo) getBalances(tx pgx.Tx, IDs ...int) ([]*model.Balance
 		tmp := model.Balance{}
 		err = rows.Scan(&tmp.ID, &tmp.Currency, &tmp.Balance, &tmp.Locked, &tmp.UserID)
 		if err != nil {
-			log.Errorf("#getBalances(...) error while scanning balances with IDs %s; error %w", IDs, err)
+			log.Errorf("#getBalances(...) error while scanning balances with IDs %s; error %v", IDs, err)
 			return nil, err
 		}
 		balances = append(balances, &tmp)
@@ -298,17 +297,16 @@ func (r PostgreBalanceRepo) saveBalances(tx pgx.Tx, balance []*model.Balance) er
 
 func (r PostgreBalanceRepo) finishTx(err error, tx pgx.Tx) error {
 	if err != nil {
-		log.Errorf("#finishTransaction(...) error: %w", err)
 		if rollbackErr := tx.Rollback(context.Background()); rollbackErr != nil {
-			log.Errorf("#finishTransaction(...) failed when rollback, error: %w", err)
-			return fmt.Errorf("unable to rollback a transaction; error: %w", err)
+			log.Errorf("#finishTransaction(...) failed when rollback, error: %v", err)
+			return fmt.Errorf("unable to rollback a transaction; error: %v", err)
 		}
 
 		return err
 	}
 	if commitErr := tx.Commit(context.Background()); commitErr != nil {
-		log.Errorf("finishTransaction failed when commiting, error: %w", err)
-		return fmt.Errorf("unable to commit a transaction; error: %w", err)
+		log.Errorf("finishTransaction failed when commiting, error: %v", err)
+		return fmt.Errorf("unable to commit a transaction; error: %v", err)
 	}
 	return nil
 }

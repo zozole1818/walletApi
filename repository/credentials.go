@@ -29,7 +29,7 @@ func (cred CredentialsDB) Get(login string) (Credentials, error) {
 		if err == pgx.ErrNoRows {
 			return Credentials{}, ErrRecordNotFound
 		}
-		log.Errorf("error while reading credentials for user with login %s; error %w", login, err)
+		log.Errorf("error while reading credentials for user with login %s; error %v", login, err)
 		return Credentials{}, err
 	}
 	return credentials, nil
