@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  db:
+    image: "postgres:14.1"
+    environment:
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - 5432:5432
+  web:
+    build:
+      context: ../
+      dockerfile: devops/web/Dockerfile
+    image: walletapi:v1
+    environment:
+      - DATABASE_URL=postgres://postgres:admin@db:5432/wallets
+    command: ["/app/devops/web/entrypoint.sh"]
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
