@@ -4,7 +4,7 @@ RUN apk add bash
 RUN apk add postgresql-client
 
 COPY ./. /app
-RUN go get github.com/swaggo/swag/cmd/swag
+RUN go get github.com/swaggo/swag/cmd/swag@v1.7.6
 
 WORKDIR /app
 RUN swag init -d cmd/,controller/,model/
