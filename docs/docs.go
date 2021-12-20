@@ -90,8 +90,8 @@ var doc = `{
                 "summary": "Retrives list of transactions.",
                 "operationId": "RetriveTransactions",
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
