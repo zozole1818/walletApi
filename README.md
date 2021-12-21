@@ -16,6 +16,7 @@ Project is POC and the **key features** are:
 ## Assumptions/Limitations
 * user can only have zero or positive balance (no debet)
 * only one type of currency is supported - that is SGD, all transactions and balance are in SGD
+* amount of money send in TransferRequest is rounded down to 2 decimal places
 * docker-compose that starts walletApi and postgres db **DOES NOT** mount any files - that's why if you kill the docker-compose's dockers and start again, fresh installation will be available
 * server is using http
 
