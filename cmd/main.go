@@ -35,7 +35,7 @@ import (
 // @name Authorization
 func main() {
 
-	pool, err := pgxpool.Connect(context.Background(), EnvWithDefault("DATABASE_URL", "postgres://postgres:admin@localhost:5432/mobile_wallet"))
+	pool, err := pgxpool.Connect(context.Background(), EnvWithDefault("DATABASE_URL", "postgres://postgres:admin@localhost:5432/wallets"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
