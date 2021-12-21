@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"math"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -63,7 +64,7 @@ func (ctr *TransactionController) ExecuteTransaction(c echo.Context) error {
 	transaction := model.Transaction{
 		SenderBalanceID:   t.SenderBalanceID,
 		ReceiverBalanceID: t.ReceiverBalanceID,
-		Amount:            t.Amount,
+		Amount:            math.Floor(t.Amount*100) / 100,
 		Currency:          model.SGD,
 	}
 
