@@ -71,7 +71,7 @@ This is only POC created really fast. Many things can be done in a different way
 * authentication should be stronger not just JWT token based on username/password
 * all structs/objects can and should be more detailed, e.g. transaction request should have title, description...
 * retriving transaction for now is only by userID - some more restrictions and pagination would be good
-* more jUnits added
+* more tests added
 * must have https
 * fully functional solution should have logging capture, e.g. Elasticsearch -> Kibana
 * when comes to logging audit logging would be nice
