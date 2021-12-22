@@ -62,7 +62,7 @@ Users provisioned during startup:
 
 **NOTE:** When you set Bearer token then you're able to see balances and transactions for **the user that was authorized**. To see balances and transactions of different user you must login with different credentials.
 
-## Prometheus metric endpoint
+#### Prometheus metric endpoint
 Prometheus metric endpoint is not visible on swagger UI. To see metrics please go to `http://localhost:8000/metrics`.
 
 ### Future enhancement?
