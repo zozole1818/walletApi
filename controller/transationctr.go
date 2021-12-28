@@ -113,5 +113,5 @@ func (ctr *TransactionController) RetriveTransactions(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, model.NewErrResponse(http.StatusInternalServerError, ErrInternalServerMsg))
 	}
 
-	return c.JSON(http.StatusCreated, model.NewTransactionResponses(transactions))
+	return c.JSON(http.StatusOK, model.NewTransactionResponses(transactions))
 }
