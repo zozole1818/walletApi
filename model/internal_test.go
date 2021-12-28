@@ -66,11 +66,11 @@ func TestBalanceDecrease(t *testing.T) {
 	}
 }
 
-func TestTransactionDDDIsValid(t *testing.T) {
+func TestTransactionFullIsValid(t *testing.T) {
 	b1 := Balance{Balance: 2000.00, Locked: false}
 	b2 := Balance{Balance: 2000.00, Locked: false}
 
-	transaction := TransactionDDD{
+	transaction := TransactionFull{
 		SenderBalance:   &b1,
 		ReceiverBalance: &b2,
 		Amount:          250.86,
@@ -82,11 +82,11 @@ func TestTransactionDDDIsValid(t *testing.T) {
 	}
 }
 
-func TestTransactionDDDMake(t *testing.T) {
+func TestTransactionFullMake(t *testing.T) {
 	b1 := Balance{Balance: 2000.00, Locked: false}
 	b2 := Balance{Balance: 2000.00, Locked: false}
 
-	transaction := TransactionDDD{
+	transaction := TransactionFull{
 		SenderBalance:   &b1,
 		ReceiverBalance: &b2,
 		Amount:          250.86,

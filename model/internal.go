@@ -45,7 +45,7 @@ type Transaction struct {
 	Date              time.Time
 }
 
-type TransactionDDD struct {
+type TransactionFull struct {
 	ID              int
 	SenderBalance   *Balance
 	ReceiverBalance *Balance
@@ -54,11 +54,11 @@ type TransactionDDD struct {
 	Date            time.Time
 }
 
-func (t *TransactionDDD) IsValid() bool {
+func (t *TransactionFull) IsValid() bool {
 	return !t.SenderBalance.IsLocked() && !t.ReceiverBalance.IsLocked() && t.SenderBalance.Balance > t.Amount
 }
 
-func (t *TransactionDDD) Make() {
+func (t *TransactionFull) Make() {
 	t.SenderBalance.Decrease(t.Amount)
 	t.ReceiverBalance.Increase(t.Amount)
 	t.Date = time.Now()

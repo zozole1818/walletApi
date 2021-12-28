@@ -31,6 +31,7 @@ require (
 
 require (
 	github.com/jackc/puddle v1.2.0 // indirect
+	github.com/pashagolub/pgxmock v1.4.3
 	github.com/swaggo/echo-swagger v1.1.4
 	github.com/swaggo/swag v1.7.4
 )

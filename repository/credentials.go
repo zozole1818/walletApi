@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/labstack/gommon/log"
 	"zuzanna.com/walletapi/model"
 )
@@ -17,12 +16,13 @@ type CredentialsRepo interface {
 }
 
 type PostgreCredentialsRepo struct {
-	*pgxpool.Pool
+	DBConn pgxConn
 }
 
 func (cred PostgreCredentialsRepo) Get(login string) (model.Credentials, error) {
 	credentials := model.Credentials{}
-	err := cred.Pool.QueryRow(context.Background(), "SELECT login, password, user_id FROM credentials WHERE login=$1", login).Scan(&credentials.Login, &credentials.Password, &credentials.UserID)
+	err := cred.DBConn.QueryRow(context.Background(),
+		"SELECT login, password, user_id FROM credentials WHERE login=$1", login).Scan(&credentials.Login, &credentials.Password, &credentials.UserID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return model.Credentials{}, ErrRecordNotFound

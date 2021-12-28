@@ -56,7 +56,7 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 	}
 
 	// make transaction
-	newTransaction, err := svc.repo.MakeTransaction(t, func(t *model.TransactionDDD) (*model.TransactionDDD, error) {
+	newTransaction, err := svc.repo.MakeTransaction(t, func(t *model.TransactionFull) (*model.TransactionFull, error) {
 		if userID != t.SenderBalance.UserID {
 			log.Warnf("#Execute(...) failed while making transaction, error: %v,", ErrUnauthorizedTransaction)
 			return nil, ErrUnauthorizedTransaction

@@ -18,22 +18,22 @@ type BalanceRepo interface {
 	GetList(userID int) ([]*model.Balance, error)
 	UpdateBalances(balanceIDs []int, updateFn func(b []*model.Balance) ([]*model.Balance, error)) error
 
-	MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (model.Transaction, error)
+	MakeTransaction(t model.Transaction, fn func(t *model.TransactionFull) (*model.TransactionFull, error)) (model.Transaction, error)
 	GetTransactions(userID int) ([]model.Transaction, error)
 }
 
 type PostgreBalanceRepo struct {
-	*pgxpool.Pool
+	DBConn pgxConn
 }
 
 func NewPostgreBalanceRepo(pool *pgxpool.Pool) *PostgreBalanceRepo {
-	return &PostgreBalanceRepo{Pool: pool}
+	return &PostgreBalanceRepo{DBConn: pool}
 }
 
 // Get retrieves all balances assigned to particular user.
 func (r PostgreBalanceRepo) GetList(userID int) ([]*model.Balance, error) {
 	balances := []*model.Balance{}
-	rows, err := r.Pool.Query(context.Background(), "SELECT id, currency, balance, user_id FROM balance WHERE user_id=$1", userID)
+	rows, err := r.DBConn.Query(context.Background(), "SELECT id, currency, balance, user_id FROM balance WHERE user_id=$1", userID)
 	if err != nil {
 		log.Errorf("error while retrieving balances for user with ID %d; error %v", userID, err)
 		return nil, err
@@ -53,7 +53,7 @@ func (r PostgreBalanceRepo) GetList(userID int) ([]*model.Balance, error) {
 }
 
 func (r PostgreBalanceRepo) GetTransactions(userID int) (transactions []model.Transaction, err error) {
-	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
+	tx, err := r.DBConn.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		log.Errorf("#GetTransactions(...) failed, error: %v", err)
 		return nil, fmt.Errorf("unable to start a transaction; error: %w", err)
@@ -117,7 +117,7 @@ func (r PostgreBalanceRepo) getTransactionsByBalanceIDs(tx pgx.Tx, balanceIDs []
 
 // UpdateBalance update couple of balances by applying updateFn. All actions than happen here are included in one transaction.
 func (r PostgreBalanceRepo) UpdateBalances(IDs []int, updateFn func(bs []*model.Balance) ([]*model.Balance, error)) (err error) {
-	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
+	tx, err := r.DBConn.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		log.Errorf("#UpdateBalances(...) failed, error: %v", err)
 		return fmt.Errorf("unable to start a transaction; error: %w", err)
@@ -148,8 +148,8 @@ func (r PostgreBalanceRepo) UpdateBalances(IDs []int, updateFn func(bs []*model.
 	return nil
 }
 
-func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (madeTransaction model.Transaction, err error) {
-	tx, err := r.Pool.BeginTx(context.Background(), pgx.TxOptions{})
+func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *model.TransactionFull) (*model.TransactionFull, error)) (madeTransaction model.Transaction, err error) {
+	tx, err := r.DBConn.BeginTx(context.Background(), pgx.TxOptions{})
 	if err != nil {
 		log.Errorf("#MakeTransaction(...) failed, error: %v", err)
 		return model.Transaction{}, fmt.Errorf("unable to start a transaction; error: %w", err)
@@ -163,16 +163,16 @@ func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *mode
 		return model.Transaction{}, err
 	}
 
-	var transaction *model.TransactionDDD
+	var transaction *model.TransactionFull
 	if existingBalances[0].ID == t.SenderBalanceID {
-		transaction = &model.TransactionDDD{
+		transaction = &model.TransactionFull{
 			SenderBalance:   existingBalances[0],
 			ReceiverBalance: existingBalances[1],
 			Amount:          t.Amount,
 			Currency:        t.Currency,
 		}
 	} else {
-		transaction = &model.TransactionDDD{
+		transaction = &model.TransactionFull{
 			SenderBalance:   existingBalances[1],
 			ReceiverBalance: existingBalances[0],
 			Amount:          t.Amount,
@@ -198,7 +198,7 @@ func (r PostgreBalanceRepo) MakeTransaction(t model.Transaction, fn func(t *mode
 	return madeTransaction, nil
 }
 
-func (r PostgreBalanceRepo) createTransaction(tx pgx.Tx, t model.TransactionDDD) (model.Transaction, error) {
+func (r PostgreBalanceRepo) createTransaction(tx pgx.Tx, t model.TransactionFull) (model.Transaction, error) {
 	var tID int
 	err := tx.QueryRow(context.Background(),
 		"INSERT INTO transaction (sender_id, receiver_id, currency, amount, date) VALUES ($1, $2, $3, $4, $5) RETURNING id",

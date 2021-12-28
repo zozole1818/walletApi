@@ -48,7 +48,7 @@ func main() {
 	p.Use(e)
 
 	loginSvc := service.AuthServiceImpl{
-		CredentialsRepo: repository.PostgreCredentialsRepo{Pool: pool},
+		CredentialsRepo: repository.PostgreCredentialsRepo{DBConn: pool},
 	}
 	postgreBalanceRepo := repository.NewPostgreBalanceRepo(pool)
 	loginController := controller.LoginController{
