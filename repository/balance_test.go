@@ -10,10 +10,6 @@ import (
 	"zuzanna.com/walletapi/model"
 )
 
-// 	UpdateBalances(balanceIDs []int, updateFn func(b []*model.Balance) ([]*model.Balance, error)) error
-
-// 	MakeTransaction(t model.Transaction, fn func(t *model.TransactionDDD) (*model.TransactionDDD, error)) (model.Transaction, error)
-
 func TestGetList(t *testing.T) {
 	mockPool, err := pgxmock.NewPool(pgxmock.QueryMatcherOption(pgxmock.QueryMatcherEqual))
 	if err != nil {
