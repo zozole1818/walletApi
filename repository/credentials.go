@@ -7,30 +7,28 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/labstack/gommon/log"
+	"zuzanna.com/walletapi/model"
 )
 
 var ErrRecordNotFound = errors.New("record not found")
 
-type Credentials struct {
-	ID       int
-	Login    string
-	Password string
-	UserID   int
+type CredentialsRepo interface {
+	Get(login string) (model.Credentials, error)
 }
 
-type CredentialsDB struct {
+type PostgreCredentialsRepo struct {
 	*pgxpool.Pool
 }
 
-func (cred CredentialsDB) Get(login string) (Credentials, error) {
-	credentials := Credentials{}
+func (cred PostgreCredentialsRepo) Get(login string) (model.Credentials, error) {
+	credentials := model.Credentials{}
 	err := cred.Pool.QueryRow(context.Background(), "SELECT login, password, user_id FROM credentials WHERE login=$1", login).Scan(&credentials.Login, &credentials.Password, &credentials.UserID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return Credentials{}, ErrRecordNotFound
+			return model.Credentials{}, ErrRecordNotFound
 		}
 		log.Errorf("error while reading credentials for user with login %s; error %v", login, err)
-		return Credentials{}, err
+		return model.Credentials{}, err
 	}
 	return credentials, nil
 }

@@ -63,3 +63,10 @@ func (t *TransactionDDD) Make() {
 	t.ReceiverBalance.Increase(t.Amount)
 	t.Date = time.Now()
 }
+
+type Credentials struct {
+	ID       int
+	Login    string
+	Password string
+	UserID   int
+}

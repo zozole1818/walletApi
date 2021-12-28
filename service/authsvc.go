@@ -23,7 +23,7 @@ type AuthService interface {
 }
 
 type AuthServiceImpl struct {
-	repository.CredentialsDB
+	repository.CredentialsRepo
 }
 
 var jwtTokenSign []byte
@@ -57,7 +57,7 @@ func JWTErrorHandlerWithContext(err error, c echo.Context) error {
 }
 
 func (svc AuthServiceImpl) Authenticate(login, password string) (string, error) {
-	credentials, err := svc.CredentialsDB.Get(login)
+	credentials, err := svc.CredentialsRepo.Get(login)
 	if err != nil {
 		if err == repository.ErrRecordNotFound {
 			log.Infof("no record found for login %s", login)
