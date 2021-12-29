@@ -277,7 +277,7 @@ func (r PostgreBalanceRepo) getBalances(tx pgx.Tx, IDs ...int) ([]*model.Balance
 }
 
 func (r PostgreBalanceRepo) saveBalance(tx pgx.Tx, balance *model.Balance) error {
-	_, err := tx.Exec(context.Background(), "UPDATE balance SET balance=$1 WHERE id=$2", balance.Balance, balance.ID)
+	_, err := tx.Exec(context.Background(), "UPDATE balance SET balance=$1, locked=$2 WHERE id=$3", balance.Balance, balance.Locked, balance.ID)
 	if err != nil {
 		log.Errorf("#saveBalance(...) error: %w", err)
 		return err
@@ -298,14 +298,14 @@ func (r PostgreBalanceRepo) saveBalances(tx pgx.Tx, balance []*model.Balance) er
 func (r PostgreBalanceRepo) finishTx(err error, tx pgx.Tx) error {
 	if err != nil {
 		if rollbackErr := tx.Rollback(context.Background()); rollbackErr != nil {
-			log.Errorf("#finishTransaction(...) failed when rollback, error: %v", err)
+			log.Errorf("#finishTx(...) failed when rollback, error: %v", err)
 			return fmt.Errorf("unable to rollback a transaction; error: %v", err)
 		}
 
 		return err
 	}
 	if commitErr := tx.Commit(context.Background()); commitErr != nil {
-		log.Errorf("finishTransaction failed when commiting, error: %v", err)
+		log.Errorf("finishTx(...) failed when commiting, error: %v", err)
 		return fmt.Errorf("unable to commit a transaction; error: %v", err)
 	}
 	return nil

@@ -18,7 +18,7 @@ psql -h db -U postgres -d wallets -c 'INSERT INTO "balance"(currency, balance, u
 
 psql -h db -U postgres -d wallets -c 'INSERT INTO "user"(first_name, last_name, age) VALUES('"'"'Zuzanna'"'"', '"'"'Zazu'"'"', 18);'
 psql -h db -U postgres -d wallets -c 'INSERT INTO "credentials"(login, password, user_ID) VALUES('"'"'zazu18'"'"', '"'"'aGFzbG8='"'"', 2);'
-psql -h db -U postgres -d wallets -c 'INSERT INTO "balance"(currency, balance, user_ID) VALUES('"'"'SGD'"'"', 0, 2);'
+psql -h db -U postgres -d wallets -c 'INSERT INTO "balance"(currency, balance, user_ID) VALUES('"'"'SGD'"'"', 100, 2);'
 
 psql -h db -U postgres -d wallets -c 'INSERT INTO "user"(first_name, last_name, age) VALUES('"'"'John'"'"', '"'"'Doe'"'"', 40);'
 psql -h db -U postgres -d wallets -c 'INSERT INTO "credentials"(login, password, user_ID) VALUES('"'"'johndoe11'"'"', '"'"'aGFzbG8='"'"', 3);'

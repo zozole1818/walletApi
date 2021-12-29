@@ -10,7 +10,7 @@ import (
 
 var ErrBalanceNotFound = errors.New("sender or receiver balances not found")
 var ErrBalancesLocked = errors.New("sender or receiver balances are locked, new transaction is not allowed")
-var ErrInsufficientBalance = errors.New("sender/receiver locked or insufficient balance of a sender")
+var ErrInsufficientBalance = errors.New("sender/receiver unlocked or insufficient balance of a sender")
 var ErrUnauthorizedTransaction = errors.New("userID from JWT token differ from balance's userID of sender for transaction")
 
 type TransactionService interface {

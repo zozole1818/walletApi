@@ -46,4 +46,8 @@ func TestGet(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("error got: %+v want: %+v", got, want)
 	}
+
+	if err := mockPool.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }

@@ -55,7 +55,7 @@ type TransactionFull struct {
 }
 
 func (t *TransactionFull) IsValid() bool {
-	return !t.SenderBalance.IsLocked() && !t.ReceiverBalance.IsLocked() && t.SenderBalance.Balance > t.Amount
+	return t.SenderBalance.IsLocked() && t.ReceiverBalance.IsLocked() && t.SenderBalance.Balance > t.Amount
 }
 
 func (t *TransactionFull) Make() {

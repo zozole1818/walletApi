@@ -67,8 +67,8 @@ func TestBalanceDecrease(t *testing.T) {
 }
 
 func TestTransactionFullIsValid(t *testing.T) {
-	b1 := Balance{Balance: 2000.00, Locked: false}
-	b2 := Balance{Balance: 2000.00, Locked: false}
+	b1 := Balance{Balance: 2000.00, Locked: true}
+	b2 := Balance{Balance: 2000.00, Locked: true}
 
 	transaction := TransactionFull{
 		SenderBalance:   &b1,

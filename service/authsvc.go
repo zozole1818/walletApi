@@ -53,7 +53,7 @@ func JWTErrorHandlerWithContext(err error, c echo.Context) error {
 	if err == middleware.ErrJWTInvalid {
 		return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, "Invalid or expired JWT token."))
 	}
-	return nil
+	return c.JSON(http.StatusUnauthorized, model.NewErrResponse(http.StatusUnauthorized, "Invalid JWT token."))
 }
 
 func (svc AuthServiceImpl) Authenticate(login, password string) (string, error) {
