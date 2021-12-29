@@ -10,6 +10,7 @@ import (
 
 var ErrBalanceNotFound = errors.New("sender or receiver balances not found")
 var ErrBalancesLocked = errors.New("sender or receiver balances are locked, new transaction is not allowed")
+var ErrBalanceUnlocked = errors.New("sender or receiver balances are unlocked, inconsistent state")
 var ErrInsufficientBalance = errors.New("sender/receiver unlocked or insufficient balance of a sender")
 var ErrUnauthorizedTransaction = errors.New("userID from JWT token differ from balance's userID of sender for transaction")
 
@@ -77,8 +78,9 @@ func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (mode
 		log.Errorf("#Execute(...) error make transaction %+v; error: %v", t, err)
 		// release locks on balances
 		errFromUpdate := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
-			if bs[0].IsLocked() && bs[1].IsLocked() {
-				return nil, ErrBalancesLocked
+			if !bs[0].IsLocked() || !bs[1].IsLocked() {
+				log.Error(ErrBalanceUnlocked.Error())
+				return nil, ErrBalanceUnlocked
 			}
 
 			bs[0].Unlock()
