@@ -16,11 +16,11 @@ import (
 
 var exampleToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.dyt0CoTl4WoVjAHI9Q_CwSKhl6d_9rhM3NrXuJttkao"
 
-type AuthServiceMock struct {
+type AuthServiceFake struct {
 	db map[string]string
 }
 
-func (svc AuthServiceMock) Authenticate(login, password string) (string, error) {
+func (svc AuthServiceFake) Authenticate(login, password string) (string, error) {
 	if svc.db[login] == password {
 		return exampleToken, nil
 	}
@@ -30,7 +30,7 @@ func (svc AuthServiceMock) Authenticate(login, password string) (string, error) 
 	return "", service.ErrUnauthorized
 }
 
-func (svc AuthServiceMock) GetUserIDFromToken(echo.Context) (int, error) {
+func (svc AuthServiceFake) GetUserIDFromToken(echo.Context) (int, error) {
 	return 1, nil
 }
 
@@ -69,7 +69,7 @@ func TestLogin(t *testing.T) {
 		c := e.NewContext(req, rec)
 		controller := LoginController{
 			E: e,
-			Svc: AuthServiceMock{
+			Svc: AuthServiceFake{
 				db: map[string]string{"ala11": "haslo"},
 			},
 		}
