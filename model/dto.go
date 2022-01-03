@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"time"
 )
@@ -19,8 +20,8 @@ func (tr TransactionRequest) IsValid() (bool, error) {
 	if tr.SenderBalanceID == tr.ReceiverBalanceID {
 		return false, errors.New("sender and receiver balances cannot be the same")
 	}
-	if tr.Amount <= 0 {
-		return false, errors.New("amount field must be greater then 0")
+	if math.Floor(tr.Amount*100)/100 <= 0 {
+		return false, errors.New("amount (rounded down to 2 decimal places) field must be greater then 0")
 	}
 	return true, nil
 }

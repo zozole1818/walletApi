@@ -2,62 +2,57 @@ package model
 
 import "testing"
 
-func TestTransactionRequestIsValid(t *testing.T) {
-	tr := TransactionRequest{
-		SenderBalanceID:   1,
-		ReceiverBalanceID: 2,
-		Amount:            10.99,
-	}
-	ok, err := tr.IsValid()
-	if !ok || err != nil {
-		t.Errorf("TransactionRequest: %+v must be valid", tr)
-	}
+type testCase struct {
+	transactionRequest TransactionRequest
+	isValid            bool
+	errMsg             string
 }
 
-func TestTransactionRequestInvalidAmount(t *testing.T) {
-	tr := TransactionRequest{
-		SenderBalanceID:   1,
-		ReceiverBalanceID: 2,
-		Amount:            -10.99,
+func TestIsValid(t *testing.T) {
+	cases := []testCase{
+		{transactionRequest: TransactionRequest{
+			SenderBalanceID:   1,
+			ReceiverBalanceID: 2,
+			Amount:            10.99,
+		},
+			isValid: true,
+			errMsg:  ""},
+		{transactionRequest: TransactionRequest{
+			SenderBalanceID:   1,
+			ReceiverBalanceID: 2,
+			Amount:            0.009,
+		},
+			isValid: false,
+			errMsg:  "amount (rounded down to 2 decimal places) field must be greater then 0"},
+		{transactionRequest: TransactionRequest{
+			SenderBalanceID:   1,
+			ReceiverBalanceID: 2,
+			Amount:            -10.99,
+		},
+			isValid: false,
+			errMsg:  "amount (rounded down to 2 decimal places) field must be greater then 0"},
+		{transactionRequest: TransactionRequest{
+			SenderBalanceID:   0,
+			ReceiverBalanceID: -3,
+			Amount:            0.99,
+		},
+			isValid: false,
+			errMsg:  "sender or receiver balance not found"},
+		{transactionRequest: TransactionRequest{
+			SenderBalanceID:   3,
+			ReceiverBalanceID: 3,
+			Amount:            0.99,
+		},
+			isValid: false,
+			errMsg:  "sender and receiver balances cannot be the same"},
 	}
-	ok, err := tr.IsValid()
-	if ok {
-		t.Errorf("TransactionRequest: %+v must be invalid", tr)
-	}
-	errMsg := "amount field must be greater then 0"
-	if err == nil || err.Error() != errMsg {
-		t.Errorf("TransactionRequest: %+v must be invalid and error must be '%s' instead of '%s'", tr, errMsg, err.Error())
-	}
-}
-
-func TestTransactionRequestInvalidSenderOrReceiver(t *testing.T) {
-	tr := TransactionRequest{
-		SenderBalanceID:   0,
-		ReceiverBalanceID: -3,
-		Amount:            0.99,
-	}
-	ok, err := tr.IsValid()
-	if ok {
-		t.Errorf("TransactionRequest: %+v must be invalid", tr)
-	}
-	errMsg := "sender or receiver balance not found"
-	if err == nil || err.Error() != errMsg {
-		t.Errorf("TransactionRequest: %+v must be invalid and error must be '%s' instead of '%s'", tr, errMsg, err.Error())
-	}
-}
-
-func TestTransactionRequestInvalidSenderTheSameAsReceiver(t *testing.T) {
-	tr := TransactionRequest{
-		SenderBalanceID:   3,
-		ReceiverBalanceID: 3,
-		Amount:            0.99,
-	}
-	ok, err := tr.IsValid()
-	if ok {
-		t.Errorf("TransactionRequest: %+v must be invalid", tr)
-	}
-	errMsg := "sender and receiver balances cannot be the same"
-	if err == nil || err.Error() != errMsg {
-		t.Errorf("TransactionRequest: %+v must be invalid and error must be '%s' instead of '%s'", tr, errMsg, err.Error())
+	for _, testCase := range cases {
+		ok, err := testCase.transactionRequest.IsValid()
+		if ok != testCase.isValid {
+			t.Errorf("TransactionRequest.IsValid() got: %t; want: %t", ok, testCase.isValid)
+		}
+		if testCase.errMsg != "" && err.Error() != testCase.errMsg {
+			t.Errorf("TransactionRequest: %+v must be invalid and error must be '%s' instead of '%s'", testCase.transactionRequest, testCase.errMsg, err.Error())
+		}
 	}
 }
