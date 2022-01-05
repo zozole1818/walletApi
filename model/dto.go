@@ -73,7 +73,7 @@ type BalanceResponse struct {
 	Balance  float64 `json:"balance" example:"10000.00"`
 }
 
-func NewBalanceResponse(b *Balance) BalanceResponse {
+func NewBalanceResponse(b Balance) BalanceResponse {
 	return BalanceResponse{
 		ID:       b.ID,
 		Currency: string(b.Currency),
@@ -81,7 +81,7 @@ func NewBalanceResponse(b *Balance) BalanceResponse {
 	}
 }
 
-func NewBalanceResponses(bs []*Balance) []BalanceResponse {
+func NewBalanceResponses(bs []Balance) []BalanceResponse {
 	balances := []BalanceResponse{}
 	for _, b := range bs {
 		balances = append(balances, NewBalanceResponse(b))

@@ -6,7 +6,7 @@ import (
 )
 
 type BalanceService interface {
-	GetByUserID(userID int) ([]*model.Balance, error)
+	GetByUserID(userID int) ([]model.Balance, error)
 }
 
 type BalanceServiceImpl struct {
@@ -20,6 +20,10 @@ func NewBalanceService(r repository.BalanceRepo) BalanceServiceImpl {
 	return BalanceServiceImpl{repo: r}
 }
 
-func (svc BalanceServiceImpl) GetByUserID(userID int) ([]*model.Balance, error) {
-	return svc.repo.GetList(userID)
+func (svc BalanceServiceImpl) GetByUserID(userID int) ([]model.Balance, error) {
+	balances, err := svc.repo.GetList(userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.ConvertListBalanceDB(balances), nil
 }

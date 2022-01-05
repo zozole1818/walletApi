@@ -22,7 +22,7 @@ func TestGetList(t *testing.T) {
 		DBConn: dbMockPool{mockPool},
 	}
 
-	want := []model.Balance{
+	want := []model.BalanceDB{
 		{ID: 1, Currency: "SGD", Balance: 1000, UserID: 1},
 		{ID: 2, Currency: "SGD", Balance: 25.25, UserID: 1},
 	}
@@ -39,8 +39,8 @@ func TestGetList(t *testing.T) {
 	}
 
 	for i := range got {
-		if !reflect.DeepEqual(*got[i], want[i]) {
-			t.Errorf("error got: %+v want: %+v", *got[i], want[i])
+		if !reflect.DeepEqual(got[i], want[i]) {
+			t.Errorf("error got: %+v want: %+v", got[i], want[i])
 		}
 	}
 
@@ -63,7 +63,7 @@ func TestGetTransactions(t *testing.T) {
 	foundBalance := model.Balance{
 		ID: 1, Currency: "SGD", Balance: 1000, UserID: 1, Locked: false,
 	}
-	want := []model.Transaction{
+	want := []model.TransactionDB{
 		{ID: 1, SenderBalanceID: 1, ReceiverBalanceID: 2, Currency: "SGD", Amount: 3.99, Date: time.Now()},
 		{ID: 2, SenderBalanceID: 1, ReceiverBalanceID: 4, Currency: "SGD", Amount: 56.85, Date: time.Now()},
 	}
@@ -129,9 +129,9 @@ func TestUpdateBalances(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	mockPool.ExpectCommit()
 
-	err = mockRepo.UpdateBalances([]int{1, 2}, func(bs []*model.Balance) ([]*model.Balance, error) {
-		bs[0].Lock()
-		bs[1].Lock()
+	err = mockRepo.UpdateBalances([]int{1, 2}, func(bs []model.BalanceDB) ([]model.BalanceDB, error) {
+		bs[0].Locked = true
+		bs[1].Locked = true
 		return bs, nil
 	})
 	if err != nil {
@@ -154,7 +154,7 @@ func TestMakeTransaction(t *testing.T) {
 		DBConn: dbMockPool{mockPool},
 	}
 
-	transaction := model.Transaction{
+	transaction := model.TransactionDB{
 		SenderBalanceID:   1,
 		ReceiverBalanceID: 2,
 		Currency:          "SGD",
@@ -193,12 +193,29 @@ func TestMakeTransaction(t *testing.T) {
 		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
 	mockPool.ExpectCommit()
 
-	got, err := mockRepo.MakeTransaction(transaction, func(tFull *model.TransactionFull) (*model.TransactionFull, error) {
-		if !tFull.IsValid() {
-			return nil, fmt.Errorf("transaction should be valid but is not")
+	got, err := mockRepo.MakeTransaction(transaction, func(tFull model.TransactionDBFull) (model.TransactionDBFull, error) {
+		sender := model.Balance(tFull.SenderBalance)
+		receiver := model.Balance(tFull.ReceiverBalance)
+		transactionFull := model.TransactionFull{
+			ID:              tFull.ID,
+			SenderBalance:   &sender,
+			ReceiverBalance: &receiver,
+			Amount:          tFull.Amount,
+			Currency:        tFull.Currency,
+			Date:            tFull.Date,
 		}
-		tFull.Make()
-		return tFull, nil
+		if !transactionFull.IsValid() {
+			return model.TransactionDBFull{}, fmt.Errorf("transaction should be valid but is not")
+		}
+		transactionFull.Make()
+		return model.TransactionDBFull{
+			ID:              transactionFull.ID,
+			SenderBalance:   model.BalanceDB(*transactionFull.SenderBalance),
+			ReceiverBalance: model.BalanceDB(*transactionFull.ReceiverBalance),
+			Amount:          transactionFull.Amount,
+			Currency:        transactionFull.Currency,
+			Date:            transactionFull.Date,
+		}, nil
 	})
 	if err != nil {
 		t.Errorf("error was not expected while making a transaction: %s", err)
@@ -221,7 +238,7 @@ func (a AnyTime) Match(v interface{}) bool {
 	return ok
 }
 
-func validateTransactions(got, want model.Transaction, beforeTransaction time.Time) (bool, string) {
+func validateTransactions(got, want model.TransactionDB, beforeTransaction time.Time) (bool, string) {
 	if got.ID == 0 {
 		return false, fmt.Sprintf("transaction ID got: %d; want != 0", got.ID)
 	}

@@ -36,6 +36,14 @@ func (b *Balance) Decrease(amount float64) {
 	b.Balance -= amount
 }
 
+func ConvertListBalanceDB(from []BalanceDB) []Balance {
+	arr := []Balance{}
+	for _, b := range from {
+		arr = append(arr, Balance(b))
+	}
+	return arr
+}
+
 type Transaction struct {
 	ID                int
 	SenderBalanceID   int
@@ -62,6 +70,14 @@ func (t *TransactionFull) Make() {
 	t.SenderBalance.Decrease(t.Amount)
 	t.ReceiverBalance.Increase(t.Amount)
 	t.Date = time.Now()
+}
+
+func ConvertListTransactionDB(from []TransactionDB) []Transaction {
+	arr := []Transaction{}
+	for _, b := range from {
+		arr = append(arr, Transaction(b))
+	}
+	return arr
 }
 
 type Credentials struct {

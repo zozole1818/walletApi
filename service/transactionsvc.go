@@ -31,68 +31,111 @@ func NewTransactionService(r repository.BalanceRepo) TransactionService {
 }
 
 func (svc TransactionServiceImpl) Retrieve(userID int) ([]model.Transaction, error) {
-	return svc.repo.GetTransactions(userID)
+	transactions, err := svc.repo.GetTransactions(userID)
+	if err != nil {
+		return nil, err
+	}
+	return model.ConvertListTransactionDB(transactions), nil
 }
 
 // Execute executes transaction that is send specific amount of money from sender balance to receiver balance.
 func (svc TransactionServiceImpl) Execute(userID int, t model.Transaction) (model.Transaction, error) {
 
-	// acquire locks on balances
-	err := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
-		if bs[0].IsLocked() || bs[1].IsLocked() {
+	err := svc.lockBalances(t.SenderBalanceID, t.ReceiverBalanceID)
+	if err != nil {
+		return model.Transaction{}, err
+	}
+
+	newTransaction, err := svc.makeTransaction(userID, t)
+	if err != nil {
+		log.Errorf("#Execute(...) error make transaction %+v; error: %v", t, err)
+
+		errFromUpdate := svc.unlockBalances(t.SenderBalanceID, t.ReceiverBalanceID)
+		if errFromUpdate != nil {
+			return model.Transaction{}, errFromUpdate
+		}
+
+		return model.Transaction{}, err
+	}
+	return model.Transaction(newTransaction), nil
+}
+
+func (svc TransactionServiceImpl) makeTransaction(userID int, transaction model.Transaction) (model.TransactionDB, error) {
+	return svc.repo.MakeTransaction(model.TransactionDB(transaction), func(t model.TransactionDBFull) (model.TransactionDBFull, error) {
+		sender := model.Balance(t.SenderBalance)
+		receiver := model.Balance(t.ReceiverBalance)
+		transactionFull := model.TransactionFull{
+			ID:              t.ID,
+			SenderBalance:   &sender,
+			ReceiverBalance: &receiver,
+			Amount:          t.Amount,
+			Currency:        t.Currency,
+			Date:            t.Date,
+		}
+		if userID != t.SenderBalance.UserID {
+			log.Warnf("#Execute(...) failed while making transaction, error: %v,", ErrUnauthorizedTransaction)
+			return model.TransactionDBFull{}, ErrUnauthorizedTransaction
+		}
+
+		if !transactionFull.IsValid() {
+			log.Warnf("#Execute(...) failed while making transaction, error: %v", ErrInsufficientBalance)
+			return model.TransactionDBFull{}, ErrInsufficientBalance
+		}
+
+		transactionFull.Make()
+
+		transactionFull.SenderBalance.Unlock()
+		transactionFull.ReceiverBalance.Unlock()
+
+		return model.TransactionDBFull{
+			ID:              transactionFull.ID,
+			SenderBalance:   model.BalanceDB(*transactionFull.SenderBalance),
+			ReceiverBalance: model.BalanceDB(*transactionFull.ReceiverBalance),
+			Amount:          transactionFull.Amount,
+			Currency:        transactionFull.Currency,
+			Date:            transactionFull.Date,
+		}, nil
+	})
+}
+
+func (svc TransactionServiceImpl) lockBalances(senderID, balanceID int) error {
+	err := svc.repo.UpdateBalances([]int{senderID, balanceID}, func(bs []model.BalanceDB) ([]model.BalanceDB, error) {
+		balances := model.ConvertListBalanceDB(bs)
+		if balances[0].IsLocked() || balances[1].IsLocked() {
 			return nil, ErrBalancesLocked
 		}
 
-		bs[0].Lock()
-		bs[1].Lock()
+		balances[0].Lock()
+		balances[1].Lock()
 
-		return bs, nil
+		return model.ConvertListBalance(balances), nil
 	})
 	if err != nil {
 		if err == repository.ErrBalancesNotFound {
-			return model.Transaction{}, ErrBalanceNotFound
+			return ErrBalanceNotFound
 		}
 		log.Errorf("#Execute(...) error cannot acquire lock for sender/receiver balance; error: %v", err)
-		return model.Transaction{}, err
+		return err
 	}
+	return nil
+}
 
-	// make transaction
-	newTransaction, err := svc.repo.MakeTransaction(t, func(t *model.TransactionFull) (*model.TransactionFull, error) {
-		if userID != t.SenderBalance.UserID {
-			log.Warnf("#Execute(...) failed while making transaction, error: %v,", ErrUnauthorizedTransaction)
-			return nil, ErrUnauthorizedTransaction
+func (svc TransactionServiceImpl) unlockBalances(senderID, balanceID int) error {
+	errFromUpdate := svc.repo.UpdateBalances([]int{senderID, balanceID}, func(bs []model.BalanceDB) ([]model.BalanceDB, error) {
+		balances := model.ConvertListBalanceDB(bs)
+		if !balances[0].IsLocked() || !balances[1].IsLocked() {
+			log.Error(ErrBalanceUnlocked.Error())
+			return nil, ErrBalanceUnlocked
 		}
 
-		if !t.IsValid() {
-			log.Warnf("#Execute(...) failed while making transaction, error: %v", ErrInsufficientBalance)
-			return nil, ErrInsufficientBalance
-		}
+		balances[0].Unlock()
+		balances[1].Unlock()
 
-		t.Make()
-
-		t.SenderBalance.Unlock()
-		t.ReceiverBalance.Unlock()
-		return t, nil
+		return model.ConvertListBalance(balances), nil
 	})
-	if err != nil {
-		log.Errorf("#Execute(...) error make transaction %+v; error: %v", t, err)
-		// release locks on balances
-		errFromUpdate := svc.repo.UpdateBalances([]int{t.SenderBalanceID, t.ReceiverBalanceID}, func(bs []*model.Balance) ([]*model.Balance, error) {
-			if !bs[0].IsLocked() || !bs[1].IsLocked() {
-				log.Error(ErrBalanceUnlocked.Error())
-				return nil, ErrBalanceUnlocked
-			}
-
-			bs[0].Unlock()
-			bs[1].Unlock()
-
-			return bs, nil
-		})
-		if errFromUpdate != nil {
-			log.Errorf("#UpdateBalances(...) error cannot remove lock for sender/receiver balance; error: %v", err)
-			return model.Transaction{}, errFromUpdate
-		}
-		return model.Transaction{}, err
+	if errFromUpdate != nil {
+		log.Errorf("#UpdateBalances(...) error cannot remove lock for sender/receiver balance; error: %v", errFromUpdate)
+		return errFromUpdate
 	}
-	return newTransaction, nil
+	return nil
 }
