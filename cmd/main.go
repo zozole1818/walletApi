@@ -34,6 +34,7 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	opLogSvc := service.NewJSONOperationalLogService()
 
 	pool, err := pgxpool.Connect(context.Background(), EnvWithDefault("DATABASE_URL", "postgres://postgres:admin@localhost:5432/wallets"))
 	if err != nil {
@@ -43,6 +44,10 @@ func main() {
 	defer pool.Close()
 
 	e := echo.New()
+	e.Use(middleware.BodyDumpWithConfig(middleware.BodyDumpConfig{
+		Skipper: opLogSvc.LogSkipper,
+		Handler: opLogSvc.CreateLog,
+	}))
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	p := prometheus.NewPrometheus("echo", nil)
 	p.Use(e)
